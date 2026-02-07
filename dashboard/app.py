@@ -3,7 +3,6 @@ import plotly.express as px
 import pandas as pd
 import plotly.express as px
 
-
 from data_loader import load_crime_data
 from utils import (
     apply_time_filter,
@@ -102,17 +101,6 @@ else:
 
     x_axis = "hour"
 
-st.subheader("🕒 Crime Time Heatmap")
-
-fig_heatmap = px.density_heatmap(
-    heatmap_df,
-    x=x_axis,
-    y="day_name",
-    z="count",
-    color_continuous_scale="Plasma"
-)
-
-st.plotly_chart(fig_heatmap, width="stretch")
 
 st.sidebar.header("Filters")
 
@@ -190,36 +178,107 @@ if len(analysis_df) == 0:
     st.info("No hotspot data available for analysis.")
     st.stop()
 
+
+# ----------------------------------
+# Heatmap
+# ----------------------------------
+
+# st.subheader("🕒 Crime Time Heatmap")
+
+# fig_heatmap = px.density_heatmap(
+#     heatmap_df,
+#     x=x_axis,
+#     y="day_name",
+#     z="count",
+#     color_continuous_scale="Plasma"
+# )
+
+# st.plotly_chart(fig_heatmap, width="stretch")
+
+
+
 # ----------------------------------
 # Time analysis
 # ----------------------------------
-st.subheader("⏰ Time of Crime")
 
-hour_df = hourly_distribution(analysis_df)
-fig_time = px.bar(hour_df, x="hour", y="count")
-st.plotly_chart(fig_time, use_container_width=True)
+
+# st.subheader("⏰ Time of Crime")
+
+# hour_df = hourly_distribution(analysis_df)
+# fig_time = px.bar(hour_df, x="hour", y="count")
+# st.plotly_chart(fig_time, use_container_width=True)
 
 # ----------------------------------
 # Crime types
 # ----------------------------------
-st.subheader("🏷️ Crime Type Distribution")
 
-crime_df = top_crime_types(analysis_df)
-fig_crime = px.bar(crime_df, x="crime_type", y="crime_count")
-st.plotly_chart(fig_crime, use_container_width=True)
+
+# st.subheader("🏷️ Crime Type Distribution")
+
+# crime_df = top_crime_types(analysis_df)
+
+# --- UI CONTROLS ---
+# chart_type = st.radio(
+#     "Choose visualization",
+#     ["Bar Chart", "Pie Chart"],
+#     horizontal=True
+# )
+
+# color_theme = st.selectbox(
+#     "Choose color theme",
+#     ["Plotly", "Viridis", "Cividis", "Plasma", "Turbo"]
+# )
+
+# Sort for better readability
+# crime_df = crime_df.sort_values(by="crime_count", ascending=False)
+
+# # --- BAR CHART ---
+# if chart_type == "Bar Chart":
+#     fig = px.bar(
+#         crime_df,
+#         x="crime_type",
+#         y="crime_count",
+#         color="crime_type",
+#         color_discrete_sequence=px.colors.qualitative.__dict__.get(
+#             color_theme, px.colors.qualitative.Plotly
+#         ),
+#         title="Crime Type Frequency (Bar View)"
+#     )
+
+#     fig.update_layout(
+#         xaxis_title="Crime Type",
+#         yaxis_title="Number of Crimes",
+#         showlegend=False
+#     )
+
+# --- PIE CHART ---
+# else:
+#     fig = px.pie(
+#         crime_df,
+#         names="crime_type",
+#         values="crime_count",
+#         color_discrete_sequence=px.colors.sequential.__dict__.get(
+#             color_theme, px.colors.sequential.Viridis
+#         ),
+#         title="Crime Type Share (Pie View)"
+#     )
+
+#     fig.update_traces(textinfo="percent+label")
+
+# st.plotly_chart(fig, use_container_width=True)
 
 # ----------------------------------
 # Arrest rate
 # ----------------------------------
-st.subheader("🚓 Observed Arrest Rate")
+# st.subheader("🚓 Observed Arrest Rate")
 
-rate = arrest_rate(analysis_df)
-st.metric("Arrest Rate (%)", f"{rate:.1f}")
+# rate = arrest_rate(analysis_df)
+# st.metric("Arrest Rate (%)", f"{rate:.1f}")
 
 # ----------------------------------
 # Footer
 # ----------------------------------
-st.caption(
-    "For analytical and educational use only. "
-    "Uses publicly available Chicago crime data."
-)
+# st.caption(
+#     "For analytical and educational use only. "
+#     "Uses publicly available Chicago crime data."
+# )
