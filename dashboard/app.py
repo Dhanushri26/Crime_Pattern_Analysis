@@ -42,99 +42,67 @@ st.markdown("""
             --success-color: #2ca02c;
             --neutral-color: #7f7f7f;
         }
-
+        
         * {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-
-        /* Page background */
+        
         .main {
-            background-color: #f5f6fa;
+            background-color: #f8f9f9;
         }
-
-        /* Sidebar styling */
-        section[data-testid="stSidebar"] {
-            background: #ffffff;
-            border-right: 1px solid #e0e4ea;
+        
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
         }
-
-        section[data-testid="stSidebar"] h2, 
-        section[data-testid="stSidebar"] h3 {
-            color: #1f3a93;
-        }
-
-        /* Metric cards – equal height and width for neat display */
-        [data-testid="stMetric"] {
-            background: #ffffff;
-            padding: 1rem 1.25rem;
-            border-radius: 12px;
-            box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
-            border: 1px solid #e3e7f0;
-            min-height: 115px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        [data-testid="stMetricValue"] {
-            color: #111827;
-            font-size: 2.1em;
-            font-weight: 700;
-        }
-
-        [data-testid="stMetricLabel"] {
-            color: #4b5563;
-            font-size: 0.95em;
-            font-weight: 500;
-        }
-
-        /* Headings */
+        
         h1 {
-            color: #111827;
+            color: #1f3a93;
             font-size: 2.5em;
             font-weight: 700;
-            margin-bottom: 6px;
-        }
-
-        h2 {
-            color: #1f2933;
-            font-size: 1.8em;
-            font-weight: 600;
-            margin-top: 28px;
             margin-bottom: 10px;
         }
-
+        
+        h2 {
+            color: #2d5a8c;
+            font-size: 1.8em;
+            font-weight: 600;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
         h3 {
-            color: #374151;
-            font-size: 1.25em;
+            color: #404040;
+            font-size: 1.3em;
             font-weight: 600;
         }
-
+        
         .section-divider {
-            background: linear-gradient(90deg, #1f77b4 0%, #764ba2 100%);
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
             height: 3px;
-            margin: 26px 0;
-            border-radius: 999px;
-            opacity: 0.85;
-            font-size: 10px;
+            margin: 30px 0;
+            border-radius: 2px;
         }
-
-        /* Tabs styling */
-        .stTabs [data-baseweb="tab-list"] {
-            gap: 0.25rem;
+        
+        [data-testid="stMetricValue"] {
+            color: white;
+            font-size: 2.5em;
+            font-weight: 700;
         }
-
+        
+        [data-testid="stMetricLabel"] {
+            color: rgba(255,255,255,0.9);
+            font-size: 1em;
+        }
+        
         .stTabs [data-baseweb="tab-list"] button {
-            font-size: 0.8rem;
+            font-size: 1.1em;
             font-weight: 600;
-            padding: 0.6rem 1rem;
-            border-radius: 999px;
-        }
-
-        /* Dataframe styling */
-        .stDataFrame {
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
         }
     </style>
 """, unsafe_allow_html=True)
@@ -155,12 +123,12 @@ df = cached_load_data()
 
 col1, col2 = st.columns([3, 1])
 with col1:
-    st.markdown("### Crime Pattern Analysis Dashboard")
-    st.markdown("#### Advanced spatio-temporal hotspot detection for Chicago")
-    # st.markdown("**Data source:** Chicago crime dataset | **Methodology:** DBSCAN clustering on space–time features")
+    st.markdown("# 🔍 Crime Pattern Analysis Dashboard")
+    st.markdown("### Advanced Spatio-Temporal Hotspot Detection")
+    st.markdown("**Data Source:** Chicago Crime Dataset | **Method:** DBSCAN Clustering")
 
-# with col2:
-#     st.info(f"**Last refreshed:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+with col2:
+    st.info(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
@@ -302,8 +270,8 @@ with tab1:
             title="Crime Hotspots Distribution"
         )
         
-        fig_map.update_traces(
-            hovertemplate="<b>%{hover_name}</b><br>" +
+        fig_map.update_hovertemplate(
+            "<b>%{hover_name}</b><br>" +
             "Latitude: %{lat:.4f}<br>" +
             "Longitude: %{lon:.4f}<br>" +
             "Hour: %{customdata[1]}<br>" +
@@ -545,7 +513,7 @@ with tab3:
     crime_stats = crime_stats[["Crime Type", "Count", "Percentage"]]
     
     st.dataframe(
-        crime_stats.sort_values("Count", ascending=False ),
+        crime_stats.sort_values("Count", ascending=False),
         use_container_width=True,
         hide_index=True
     )
@@ -649,4 +617,24 @@ with tab4:
         use_container_width=True,
         height=400
     )
+
+# ============================================================================
+# FOOTER
+# ============================================================================
+
+st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("### 📖 About")
+    st.markdown("Advanced crime hotspot detection using DBSCAN algorithm on Chicago crime data.")
+
+with col2:
+    st.markdown("### 🔬 Methodology")
+    st.markdown("**DBSCAN Clustering** for spatiotemporal hotspot identification. Noise points (-1) indicate isolated incidents.")
+
+with col3:
+    st.markdown("### 📊 Data")
+    st.markdown(f"**Dataset Size:** {len(df):,} total incidents\n**Time Range:** {df['date'].min().date()} to {df['date'].max().date()}")
 
