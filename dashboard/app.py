@@ -19,6 +19,21 @@ from utils import (
     get_location_stats
 )
 
+
+def _safe_int(x, default=0):
+    """Coerce to native int for display; avoid ? from numpy types in Streamlit."""
+    if pd.isna(x):
+        return default
+    return int(x)
+
+
+def _safe_float(x, default=0.0):
+    """Coerce to native float for display; avoid NaN/? in metrics."""
+    if pd.isna(x):
+        return default
+    return float(x)
+
+
 # ============================================================================
 # PAGE CONFIGURATION & STYLING
 # ============================================================================
@@ -90,14 +105,19 @@ st.markdown("""
         }
         
         [data-testid="stMetricValue"] {
-            color: white;
-            font-size: 2.5em;
+            color: #1f3a93;
+            font-size: 2.2em;
             font-weight: 700;
         }
         
         [data-testid="stMetricLabel"] {
-            color: rgba(255,255,255,0.9);
-            font-size: 1em;
+            color: #2d5a8c;
+            font-size: 0.95em;
+            font-weight: 600;
+        }
+        
+        [data-testid="stMetricDelta"] {
+            color: #404040;
         }
         
         .stTabs [data-baseweb="tab-list"] button {
@@ -115,7 +135,17 @@ st.markdown("""
 def cached_load_data():
     return load_crime_data()
 
-df = cached_load_data()
+try:
+    df = cached_load_data()
+except FileNotFoundError as e:
+    st.error(f"**Data file not found.** {e}")
+    st.stop()
+except ValueError as e:
+    st.error(f"**Invalid data:** {e}")
+    st.stop()
+except Exception as e:
+    st.error(f"**Failed to load crime data:** {e}")
+    st.stop()
 
 # ============================================================================
 # HEADER SECTION
@@ -196,22 +226,22 @@ with metric_cols[0]:
 with metric_cols[1]:
     st.metric(
         label="Active Hotspots",
-        value=hotspots,
+        value=_safe_int(hotspots),
         help="Number of spatial clusters detected"
     )
 
 with metric_cols[2]:
     st.metric(
         label="Arrests Made",
-        value=arrests_stats["total_arrests"],
-        delta=f"{arrests_stats['arrest_rate']:.1f}%",
+        value=_safe_int(arrests_stats["total_arrests"]),
+        delta=f"{_safe_float(arrests_stats['arrest_rate']):.1f}%",
         help="Total arrests and arrest rate"
     )
 
 with metric_cols[3]:
     st.metric(
         label="Noise Ratio",
-        value=f"{noise_pct:.1f}%",
+        value=f"{_safe_float(noise_pct):.1f}%",
         help="Crimes not belonging to any hotspot"
     )
 
@@ -219,7 +249,7 @@ with metric_cols[4]:
     avg_crimes_per_cluster = total / hotspots if hotspots > 0 else 0
     st.metric(
         label="Avg per Hotspot",
-        value=f"{avg_crimes_per_cluster:.0f}",
+        value=f"{_safe_float(avg_crimes_per_cluster):.0f}",
         help="Average crimes per hotspot"
     )
 
@@ -270,13 +300,15 @@ with tab1:
             title="Crime Hotspots Distribution"
         )
         
-        fig_map.update_hovertemplate(
-            "<b>%{hover_name}</b><br>" +
-            "Latitude: %{lat:.4f}<br>" +
-            "Longitude: %{lon:.4f}<br>" +
-            "Hour: %{customdata[1]}<br>" +
-            "Arrested: %{customdata[2]}<br>" +
-            "Cluster: %{customdata[3]}<extra></extra>"
+        fig_map.update_traces(
+            hovertemplate=(
+                "<b>%{hovertext}</b><br>"
+                "Latitude: %{lat:.4f}<br>"
+                "Longitude: %{lon:.4f}<br>"
+                "Hour: %{customdata[1]}<br>"
+                "Arrested: %{customdata[2]}<br>"
+                "Cluster: %{customdata[3]}<extra></extra>"
+            )
         )
         
         fig_map.update_layout(
@@ -299,14 +331,14 @@ with tab1:
                     col_a, col_b = st.columns([1, 1])
                     with col_a:
                         st.metric(
-                            f"Hotspot {int(row['st_cluster'])}",
-                            f"{int(row['count'])} crimes",
-                            help=f"Lat: {row['latitude']:.4f}, Lon: {row['longitude']:.4f}"
+                            f"Hotspot {_safe_int(row['st_cluster'])}",
+                            f"{_safe_int(row['count'])} crimes",
+                            help=f"Lat: {_safe_float(row['latitude'], 0):.4f}, Lon: {_safe_float(row['longitude'], 0):.4f}"
                         )
                     with col_b:
                         st.metric(
                             "Arrest Rate",
-                            f"{row['arrest_rate']:.1f}%"
+                            f"{_safe_float(row['arrest_rate']):.1f}%"
                         )
                     st.divider()
 
@@ -327,36 +359,35 @@ with tab2:
         .reset_index(name="count")
     )
     
-    # Reorder days
+    # Reorder days and build pivot for correct heatmap from aggregated data
     day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
     heatmap_df["day_name"] = pd.Categorical(
         heatmap_df["day_name"],
         categories=day_order,
         ordered=True
     )
-    heatmap_df = heatmap_df.sort_values(["day_name", "hour"])
+    heatmap_pivot = heatmap_df.pivot(index="day_name", columns="hour", values="count").fillna(0).reindex(day_order)
+    # Ensure all hours 0-23 exist
+    for h in range(24):
+        if h not in heatmap_pivot.columns:
+            heatmap_pivot[h] = 0
+    heatmap_pivot = heatmap_pivot[[h for h in range(24)]]
     
-    # Create heatmap
-    fig_heatmap = px.density_heatmap(
-        heatmap_df,
-        x="hour",
-        y="day_name",
-        z="count",
-        nbinsx=24,
-        nbinsy=7,
+    fig_heatmap = px.imshow(
+        heatmap_pivot,
+        labels=dict(x="Hour of Day", y="Day of Week", color="Crime Count"),
+        x=heatmap_pivot.columns.tolist(),
+        y=heatmap_pivot.index.tolist(),
         color_continuous_scale="RdYlBu_r",
-        labels={"count": "Crime Count", "hour": "Hour of Day", "day_name": "Day of Week"},
+        aspect="auto",
         height=450,
         title="Crime Activity Heatmap"
     )
-    
     fig_heatmap.update_layout(
         xaxis_title="Hour of Day (24h format)",
         yaxis_title="Day of Week",
-        coloraxis_colorbar=dict(title="Crime Count"),
         font=dict(family="Segoe UI", size=11)
     )
-    
     st.plotly_chart(fig_heatmap, use_container_width=True)
     
     col1, col2 = st.columns(2)
@@ -508,7 +539,13 @@ with tab3:
     st.markdown("#### Crime Type Statistics Table")
     
     crime_stats = crime_df.copy()
-    crime_stats["Percentage"] = (crime_stats["crime_count"] / crime_stats["crime_count"].sum() * 100).round(2).astype(str) + "%"
+    total_count = crime_stats["crime_count"].sum()
+    if total_count and total_count > 0:
+        crime_stats["Percentage"] = (
+            (crime_stats["crime_count"] / total_count * 100).fillna(0).round(2).astype(str) + "%"
+        )
+    else:
+        crime_stats["Percentage"] = "0%"
     crime_stats = crime_stats.rename(columns={"crime_type": "Crime Type", "crime_count": "Count"})
     crime_stats = crime_stats[["Crime Type", "Count", "Percentage"]]
     
@@ -571,39 +608,40 @@ with tab4:
             .sort_values("size", ascending=False)
         )
         
-        fig_clusters = px.box(
-            cluster_sizes,
-            y="size",
-            labels={"size": "Cluster Size"},
-            height=450,
-            title="Hotspot Cluster Size Distribution"
-        )
-        
-        fig_clusters.update_layout(
-            hovermode="y unified",
-            xaxis_title="",
-            font=dict(family="Segoe UI", size=11)
-        )
-        
-        st.plotly_chart(fig_clusters, use_container_width=True)
+        if not cluster_sizes.empty:
+            fig_clusters = px.box(
+                cluster_sizes,
+                y="size",
+                labels={"size": "Cluster Size"},
+                height=450,
+                title="Hotspot Cluster Size Distribution"
+            )
+            fig_clusters.update_layout(
+                hovermode="y unified",
+                xaxis_title="",
+                font=dict(family="Segoe UI", size=11)
+            )
+            st.plotly_chart(fig_clusters, use_container_width=True)
+        else:
+            st.info("No hotspot clusters in the selected filters (all points are noise).")
     
     st.markdown("### Summary Statistics")
     
     summary_col1, summary_col2, summary_col3, summary_col4 = st.columns(4)
     
     with summary_col1:
-        st.metric("Avg Crimes/Day", f"{total/time_window:.1f}")
+        st.metric("Avg Crimes/Day", f"{_safe_float(total / time_window):.1f}")
     
     with summary_col2:
         peak_hour = df_filtered.groupby("hour").size().idxmax()
-        st.metric("Peak Hour", f"{peak_hour:02d}:00")
+        st.metric("Peak Hour", f"{_safe_int(peak_hour):02d}:00")
     
     with summary_col3:
-        max_cluster = cluster_sizes.iloc[0]["size"] if not cluster_sizes.empty else 0
-        st.metric("Largest Hotspot", f"{int(max_cluster)} crimes")
+        max_cluster = _safe_int(cluster_sizes.iloc[0]["size"]) if not cluster_sizes.empty else 0
+        st.metric("Largest Hotspot", f"{max_cluster} crimes")
     
     with summary_col4:
-        unique_crimes = df_filtered["primary_type"].nunique()
+        unique_crimes = _safe_int(df_filtered["primary_type"].nunique())
         st.metric("Crime Types", unique_crimes)
     
     st.markdown("---")
@@ -611,12 +649,11 @@ with tab4:
     
     display_cols = ["date", "latitude", "longitude", "primary_type", "hour", "arrest", "st_cluster"]
     display_cols = [col for col in display_cols if col in df_filtered.columns]
-    
-    st.dataframe(
-        df_filtered[display_cols].head(100),
-        use_container_width=True,
-        height=400
-    )
+    sample_df = df_filtered[display_cols].head(100).copy()
+    for c in sample_df.columns:
+        if sample_df[c].dtype in ("float64", "float32"):
+            sample_df[c] = sample_df[c].fillna(0.0)
+    st.dataframe(sample_df, use_container_width=True, height=400)
 
 # ============================================================================
 # FOOTER
@@ -636,5 +673,7 @@ with col2:
 
 with col3:
     st.markdown("### 📊 Data")
-    st.markdown(f"**Dataset Size:** {len(df):,} total incidents\n**Time Range:** {df['date'].min().date()} to {df['date'].max().date()}")
+    d_min, d_max = df["date"].min(), df["date"].max()
+    date_range = f"{d_min.date()} to {d_max.date()}" if pd.notna(d_min) and pd.notna(d_max) else "N/A"
+    st.markdown(f"**Dataset Size:** {len(df):,} total incidents\n**Time Range:** {date_range}")
 
