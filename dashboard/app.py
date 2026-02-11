@@ -8,7 +8,6 @@ from data_loader import load_crime_data
 from utils import (
     apply_time_filter,
     get_overview_metrics,
-    get_exact_key_metrics,
     filter_by_cluster,
     top_crime_types,
     arrest_rate,
@@ -19,21 +18,6 @@ from utils import (
     get_arrest_statistics,
     get_location_stats
 )
-
-
-def _safe_float(x, default=0.0):
-    """Coerce to native float for display; avoid NaN/? in Streamlit metrics."""
-    if pd.isna(x):
-        return default
-    return float(x)
-
-
-def _safe_int(x, default=0):
-    """Coerce to native int for display; avoid ? from numpy types in Streamlit."""
-    if pd.isna(x):
-        return default
-    return int(x)
-
 
 # ============================================================================
 # PAGE CONFIGURATION & STYLING
@@ -106,18 +90,14 @@ st.markdown("""
         }
         
         [data-testid="stMetricValue"] {
-            color: #1f3a93;
+            color: white;
             font-size: 2.5em;
             font-weight: 700;
         }
         
         [data-testid="stMetricLabel"] {
-            color: #2d5a8c;
+            color: rgba(255,255,255,0.9);
             font-size: 1em;
-        }
-        
-        [data-testid="stMetricDelta"] {
-            color: #404040;
         }
         
         .stTabs [data-baseweb="tab-list"] button {
@@ -135,17 +115,7 @@ st.markdown("""
 def cached_load_data():
     return load_crime_data()
 
-try:
-    df = cached_load_data()
-except FileNotFoundError as e:
-    st.error(f"**Data file not found.** {e}")
-    st.stop()
-except ValueError as e:
-    st.error(f"**Invalid data:** {e}")
-    st.stop()
-except Exception as e:
-    st.error(f"**Failed to load crime data:** {e}")
-    st.stop()
+df = cached_load_data()
 
 # ============================================================================
 # HEADER SECTION
@@ -157,8 +127,8 @@ with col1:
     st.markdown("### Advanced Spatio-Temporal Hotspot Detection")
     st.markdown("**Data Source:** Chicago Crime Dataset | **Method:** DBSCAN Clustering")
 
-# with col2:
-    # st.info(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+with col2:
+    st.info(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
@@ -210,13 +180,8 @@ with st.sidebar:
 
 st.markdown("## 📈 Key Metrics")
 
-# Exact counts from filtered data
-m = get_exact_key_metrics(df_filtered)
-total = m["total_crimes"]
-hotspots = m["hotspot_count"]
-noise_pct = m["noise_pct"]
-noise_count = m["noise_count"]
-crimes_in_hotspots = m["crimes_in_hotspots"]
+total, hotspots, noise_pct = get_overview_metrics(df_filtered)
+arrests_stats = get_arrest_statistics(df_filtered)
 
 metric_cols = st.columns(5)
 
@@ -225,38 +190,37 @@ with metric_cols[0]:
         label="Total Crimes",
         value=f"{total:,}",
         delta=f"in {time_window}d",
-        help=f"Exact count: {total:,} incidents in selected filters"
+        help="Total crime incidents in selected period"
     )
 
 with metric_cols[1]:
     st.metric(
         label="Active Hotspots",
-        value=_safe_int(hotspots),
-        help=f"Exact: {hotspots} unique clusters · {crimes_in_hotspots:,} crimes in hotspots"
+        value=hotspots,
+        help="Number of spatial clusters detected"
     )
 
 with metric_cols[2]:
     st.metric(
         label="Arrests Made",
-        value=_safe_int(m["total_arrests"]),
-        delta=f"{_safe_float(m['arrest_rate_pct']):.1f}%",
-        help=f"Exact: {m['total_arrests']:,} arrests out of {total:,} incidents"
+        value=arrests_stats["total_arrests"],
+        delta=f"{arrests_stats['arrest_rate']:.1f}%",
+        help="Total arrests and arrest rate"
     )
 
 with metric_cols[3]:
     st.metric(
         label="Noise Ratio",
-        value=f"{_safe_float(noise_pct):.1f}%",
-        help=f"Exact: {noise_count:,} of {total:,} incidents not in any hotspot"
+        value=f"{noise_pct:.1f}%",
+        help="Crimes not belonging to any hotspot"
     )
 
 with metric_cols[4]:
-    avg_val = m["avg_per_hotspot"]
-    avg_str = f"{int(round(avg_val))}" if avg_val == int(avg_val) else f"{_safe_float(avg_val):.1f}"
+    avg_crimes_per_cluster = total / hotspots if hotspots > 0 else 0
     st.metric(
         label="Avg per Hotspot",
-        value=avg_str,
-        help=f"Exact: {crimes_in_hotspots:,} crimes ÷ {hotspots} hotspots"
+        value=f"{avg_crimes_per_cluster:.0f}",
+        help="Average crimes per hotspot"
     )
 
 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
@@ -306,13 +270,13 @@ with tab1:
             title="Crime Hotspots Distribution"
         )
         
-        fig_map.update_traces(
-            hovertemplate="<b>%{hovertext}</b><br>"
-                "Latitude: %{lat:.4f}<br>"
-                "Longitude: %{lon:.4f}<br>"
-                "Hour: %{customdata[1]}<br>"
-                "Arrested: %{customdata[2]}<br>"
-                "Cluster: %{customdata[3]}<extra></extra>"
+        fig_map.update_hovertemplate(
+            "<b>%{hover_name}</b><br>" +
+            "Latitude: %{lat:.4f}<br>" +
+            "Longitude: %{lon:.4f}<br>" +
+            "Hour: %{customdata[1]}<br>" +
+            "Arrested: %{customdata[2]}<br>" +
+            "Cluster: %{customdata[3]}<extra></extra>"
         )
         
         fig_map.update_layout(
@@ -331,26 +295,19 @@ with tab1:
         
         if not hotspot_data.empty:
             for idx, row in hotspot_data.head(5).iterrows():
-                cid = _safe_int(row["st_cluster"])
-                count = _safe_int(row["count"])
-                arrests = _safe_int(row["arrests"])
-                arate = _safe_float(row["arrest_rate"])
-                lat = _safe_float(row["latitude"], 0)
-                lon = _safe_float(row["longitude"], 0)
-                top_crime = str(row.get("top_crime_type", "—"))
-                d_min = row.get("date_min", "")
-                d_max = row.get("date_max", "")
-                if hasattr(d_min, "strftime"):
-                    d_min = d_min.strftime("%Y-%m-%d")
-                if hasattr(d_max, "strftime"):
-                    d_max = d_max.strftime("%Y-%m-%d")
                 with st.container():
-                    st.markdown(f"**Hotspot {cid}**")
-                    st.caption(f"**{count}** crimes · **{arrests}** arrests ({arate:.1f}%)")
-                    st.caption(f"Top type: {top_crime}")
-                    st.caption(f"Center: {lat:.5f}, {lon:.5f}")
-                    if d_min and d_max:
-                        st.caption(f"Date range: {d_min} → {d_max}")
+                    col_a, col_b = st.columns([1, 1])
+                    with col_a:
+                        st.metric(
+                            f"Hotspot {int(row['st_cluster'])}",
+                            f"{int(row['count'])} crimes",
+                            help=f"Lat: {row['latitude']:.4f}, Lon: {row['longitude']:.4f}"
+                        )
+                    with col_b:
+                        st.metric(
+                            "Arrest Rate",
+                            f"{row['arrest_rate']:.1f}%"
+                        )
                     st.divider()
 
 # ============================================================================
@@ -551,13 +508,7 @@ with tab3:
     st.markdown("#### Crime Type Statistics Table")
     
     crime_stats = crime_df.copy()
-    total_count = crime_stats["crime_count"].sum()
-    if total_count and total_count > 0:
-        crime_stats["Percentage"] = (
-            (crime_stats["crime_count"] / total_count * 100).fillna(0).round(2).astype(str) + "%"
-        )
-    else:
-        crime_stats["Percentage"] = "0%"
+    crime_stats["Percentage"] = (crime_stats["crime_count"] / crime_stats["crime_count"].sum() * 100).round(2).astype(str) + "%"
     crime_stats = crime_stats.rename(columns={"crime_type": "Crime Type", "crime_count": "Count"})
     crime_stats = crime_stats[["Crime Type", "Count", "Percentage"]]
     
@@ -620,22 +571,21 @@ with tab4:
             .sort_values("size", ascending=False)
         )
         
-        if not cluster_sizes.empty:
-            fig_clusters = px.box(
-                cluster_sizes,
-                y="size",
-                labels={"size": "Cluster Size"},
-                height=450,
-                title="Hotspot Cluster Size Distribution"
-            )
-            fig_clusters.update_layout(
-                hovermode="y unified",
-                xaxis_title="",
-                font=dict(family="Segoe UI", size=11)
-            )
-            st.plotly_chart(fig_clusters, use_container_width=True)
-        else:
-            st.info("No hotspot clusters in the selected filters (all points are noise).")
+        fig_clusters = px.box(
+            cluster_sizes,
+            y="size",
+            labels={"size": "Cluster Size"},
+            height=450,
+            title="Hotspot Cluster Size Distribution"
+        )
+        
+        fig_clusters.update_layout(
+            hovermode="y unified",
+            xaxis_title="",
+            font=dict(family="Segoe UI", size=11)
+        )
+        
+        st.plotly_chart(fig_clusters, use_container_width=True)
     
     st.markdown("### Summary Statistics")
     
@@ -646,14 +596,14 @@ with tab4:
     
     with summary_col2:
         peak_hour = df_filtered.groupby("hour").size().idxmax()
-        st.metric("Peak Hour", f"{_safe_int(peak_hour):02d}:00")
-
+        st.metric("Peak Hour", f"{peak_hour:02d}:00")
+    
     with summary_col3:
-        max_cluster = _safe_int(cluster_sizes.iloc[0]["size"]) if not cluster_sizes.empty else 0
-        st.metric("Largest Hotspot", f"{max_cluster} crimes")
-
+        max_cluster = cluster_sizes.iloc[0]["size"] if not cluster_sizes.empty else 0
+        st.metric("Largest Hotspot", f"{int(max_cluster)} crimes")
+    
     with summary_col4:
-        unique_crimes = _safe_int(df_filtered["primary_type"].nunique())
+        unique_crimes = df_filtered["primary_type"].nunique()
         st.metric("Crime Types", unique_crimes)
     
     st.markdown("---")
@@ -661,14 +611,9 @@ with tab4:
     
     display_cols = ["date", "latitude", "longitude", "primary_type", "hour", "arrest", "st_cluster"]
     display_cols = [col for col in display_cols if col in df_filtered.columns]
-    sample_df = df_filtered[display_cols].head(100).copy()
-    # Avoid nan/? in table for float columns only (preserve ints like st_cluster -1)
-    for c in sample_df.columns:
-        if sample_df[c].dtype in ("float64", "float32"):
-            sample_df[c] = sample_df[c].fillna(0.0)
     
     st.dataframe(
-        sample_df,
+        df_filtered[display_cols].head(100),
         use_container_width=True,
         height=400
     )
@@ -691,11 +636,5 @@ with col2:
 
 with col3:
     st.markdown("### 📊 Data")
-    d_min = df["date"].min()
-    d_max = df["date"].max()
-    if pd.notna(d_min) and pd.notna(d_max):
-        date_range = f"{d_min.date()} to {d_max.date()}"
-    else:
-        date_range = "N/A"
-    st.markdown(f"**Dataset Size:** {len(df):,} total incidents\n**Time Range:** {date_range}")
+    st.markdown(f"**Dataset Size:** {len(df):,} total incidents\n**Time Range:** {df['date'].min().date()} to {df['date'].max().date()}")
 

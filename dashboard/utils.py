@@ -7,45 +7,10 @@ def apply_time_filter(df, days):
 
 def get_overview_metrics(df):
     total = len(df)
-    noise_pct = float((df["st_cluster"] == -1).mean() * 100) if total > 0 else 0.0
-    hotspots = int(df[df["st_cluster"] != -1]["st_cluster"].nunique())
+    noise_pct = (df["st_cluster"] == -1).mean() * 100 if total > 0 else 0
+    hotspots = df[df["st_cluster"] != -1]["st_cluster"].nunique()
 
     return total, hotspots, noise_pct
-
-
-def get_exact_key_metrics(df):
-    """Exact counts from data for key metrics (no rounding until display)."""
-    total = len(df)
-    if total == 0:
-        return {
-            "total_crimes": 0,
-            "noise_count": 0,
-            "crimes_in_hotspots": 0,
-            "hotspot_count": 0,
-            "total_arrests": 0,
-            "arrest_rate_pct": 0.0,
-            "noise_pct": 0.0,
-            "avg_per_hotspot": 0.0,
-        }
-    noise_mask = df["st_cluster"] == -1
-    noise_count = int(noise_mask.sum())
-    hotspot_df = df[df["st_cluster"] != -1]
-    crimes_in_hotspots = len(hotspot_df)
-    hotspot_count = int(hotspot_df["st_cluster"].nunique())
-    total_arrests = int(df["arrest"].sum()) if "arrest" in df.columns else 0
-    arrest_rate_pct = float(total_arrests / total * 100)
-    noise_pct = float(noise_count / total * 100)
-    avg_per_hotspot = crimes_in_hotspots / hotspot_count if hotspot_count > 0 else 0.0
-    return {
-        "total_crimes": total,
-        "noise_count": noise_count,
-        "crimes_in_hotspots": crimes_in_hotspots,
-        "hotspot_count": hotspot_count,
-        "total_arrests": total_arrests,
-        "arrest_rate_pct": arrest_rate_pct,
-        "noise_pct": noise_pct,
-        "avg_per_hotspot": avg_per_hotspot,
-    }
 
 def filter_by_cluster(df, cluster):
     if cluster == "All":
@@ -69,39 +34,27 @@ def arrest_rate(df):
     return df["arrest"].mean() * 100
 
 def get_cluster_hotspots(df):
-    """Get top hotspots with exact stats from data: count, arrests, centroid, top crime, date range."""
+    """Get top hotspots with crime stats"""
     if "st_cluster" not in df.columns:
         return pd.DataFrame()
-
-    cluster_df = df[df["st_cluster"] != -1]
-    if cluster_df.empty:
-        return pd.DataFrame()
-
-    # Exact aggregates from data
-    agg = cluster_df.groupby("st_cluster").agg(
-        latitude=("latitude", "mean"),
-        longitude=("longitude", "mean"),
-        count=("primary_type", "count"),
-        arrests=("arrest", "sum"),
-        date_min=("date", "min"),
-        date_max=("date", "max"),
-    ).reset_index()
-
-    # Arrest rate from exact counts
-    agg["arrest_rate"] = (agg["arrests"] / agg["count"] * 100).round(2)
-    agg["arrests"] = agg["arrests"].astype(int)
-
-    # Top crime type per cluster (mode from data)
-    def top_crime(s):
-        vc = s.value_counts()
-        return vc.index[0] if len(vc) else "—"
-
-    top_crimes = cluster_df.groupby("st_cluster")["primary_type"].apply(top_crime).reset_index()
-    top_crimes.columns = ["st_cluster", "top_crime_type"]
-    agg = agg.merge(top_crimes, on="st_cluster", how="left")
-
-    agg = agg.sort_values("count", ascending=False)
-    return agg
+    
+    hotspot_stats = (
+        df[df["st_cluster"] != -1]
+        .groupby("st_cluster")
+        .agg({
+            "latitude": "mean",
+            "longitude": "mean",
+            "primary_type": "count",
+            "arrest": "mean"
+        })
+        .reset_index()
+        .rename(columns={"primary_type": "count", "arrest": "arrest_rate"})
+    )
+    
+    hotspot_stats["arrest_rate"] = hotspot_stats["arrest_rate"] * 100
+    hotspot_stats = hotspot_stats.sort_values("count", ascending=False)
+    
+    return hotspot_stats
 
 def get_daily_crime_trend(df):
     """Get daily crime trend"""
@@ -130,7 +83,7 @@ def get_day_week_distribution(df):
 def get_arrest_statistics(df):
     """Get arrest statistics"""
     total_arrests = df["arrest"].sum() if "arrest" in df.columns else 0
-    arrest_pct = float(total_arrests / len(df) * 100) if len(df) > 0 else 0.0
+    arrest_pct = (total_arrests / len(df) * 100) if len(df) > 0 else 0
     
     return {
         "total_arrests": int(total_arrests),
