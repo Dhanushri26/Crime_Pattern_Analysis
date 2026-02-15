@@ -55,11 +55,14 @@ st.markdown("""
             --secondary-color: #ff7f0e;
             --danger-color: #d62728;
             --success-color: #2ca02c;
-            --neutral-color: #7f7f7f;
+            --neutral-color: #FFE5B4;
+            --heading-color: #191970;
+            padding : 10px;
         }
         
         * {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            
         }
         
         .main {
@@ -68,7 +71,7 @@ st.markdown("""
         
         .metric-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            color: #FFE5B4;
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
@@ -85,7 +88,7 @@ st.markdown("""
             color: #2d5a8c;
             font-size: 1.8em;
             font-weight: 600;
-            margin-top: 30px;
+            margin-top: 15px;
             margin-bottom: 15px;
             padding-bottom: 10px;
             border-bottom: 3px solid #667eea;
@@ -99,20 +102,22 @@ st.markdown("""
         
         .section-divider {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            height: 3px;
-            margin: 30px 0;
+            height: 2px;
+            margin: 15px 0;
             border-radius: 2px;
+            color: #FFE5B4;
+
         }
         
         [data-testid="stMetricValue"] {
-            color: #1f3a93;
+            color: #FFAA94;
             font-size: 2.2em;
             font-weight: 700;
         }
         
         [data-testid="stMetricLabel"] {
             color: #2d5a8c;
-            font-size: 0.95em;
+            font-size: 14px !important;
             font-weight: 600;
         }
         
@@ -124,6 +129,27 @@ st.markdown("""
             font-size: 1.1em;
             font-weight: 600;
         }
+
+        /* Reduce metric label size */
+div[data-testid="stMetricLabel"] {
+    font-size: 18px !important;
+}
+
+/* Reduce metric value size */
+div[data-testid="stMetricValue"] {
+    font-size: 25px !important;
+    font-weight: 600;
+}
+
+/* Optional: color crime count differently */
+.crime-metric div[data-testid="stMetricValue"] {
+    color: #ff4b4b !important;   /* red */
+}
+
+/* Optional: color arrest rate differently */
+.arrest-metric div[data-testid="stMetricValue"] {
+    color: #00c853 !important;   /* green */
+}
     </style>
 """, unsafe_allow_html=True)
 
@@ -151,22 +177,27 @@ except Exception as e:
 # HEADER SECTION
 # ============================================================================
 
-col1, col2 = st.columns([3, 1])
-with col1:
+# col1, col2 = st.columns([3, 1])
+# with col1:
+#     st.markdown("# 🔍 Crime Pattern Analysis Dashboard")
+#     st.markdown("### Advanced Spatio-Temporal Hotspot Detection")
+#     st.markdown("**Data Source:** Chicago Crime Dataset | **Method:** DBSCAN Clustering")
+
+# with col2:
+#     st.info(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+# st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+
+with st.container():
     st.markdown("# 🔍 Crime Pattern Analysis Dashboard")
     st.markdown("### Advanced Spatio-Temporal Hotspot Detection")
-    st.markdown("**Data Source:** Chicago Crime Dataset | **Method:** DBSCAN Clustering")
-
-with col2:
-    st.info(f"**Last Updated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
-
+    # st.markdown("**Data Source:** Chicago Crime Dataset | **Method:** DBSCAN Clustering")
+    st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 # ============================================================================
 # SIDEBAR FILTERS
 # ============================================================================
 
-st.sidebar.markdown("## 🔧 Analysis Filters")
+st.sidebar.markdown("## Analysis Filters")
 st.sidebar.markdown("Configure the dashboard parameters below")
 
 with st.sidebar:
@@ -208,7 +239,17 @@ with st.sidebar:
 # KEY METRICS SECTION
 # ============================================================================
 
-st.markdown("## 📈 Key Metrics")
+st.markdown(
+    """
+    <h1 style='color: #191970; text-align: left; font-size: 2.5em; font-weight: 700;'>
+        Key Metrics 
+    </h1>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
 
 total, hotspots, noise_pct = get_overview_metrics(df_filtered)
 arrests_stats = get_arrest_statistics(df_filtered)
@@ -296,7 +337,7 @@ with tab1:
             hover_name="primary_type",
             zoom=9,
             height=600,
-            color_continuous_scale="Viridis",
+            color_continuous_scale="plasma",
             title="Crime Hotspots Distribution"
         )
         
@@ -326,7 +367,7 @@ with tab1:
         hotspot_data = get_cluster_hotspots(df_filtered)
         
         if not hotspot_data.empty:
-            for idx, row in hotspot_data.head(5).iterrows():
+            for idx, row in hotspot_data.head(4).iterrows():
                 with st.container():
                     col_a, col_b = st.columns([1, 1])
                     with col_a:
@@ -659,21 +700,21 @@ with tab4:
 # FOOTER
 # ============================================================================
 
-st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
+# st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns(3)
+# col1, col2, col3 = st.columns(3)
 
-with col1:
-    st.markdown("### 📖 About")
-    st.markdown("Advanced crime hotspot detection using DBSCAN algorithm on Chicago crime data.")
+# with col1:
+#     st.markdown("### 📖 About")
+#     st.markdown("Advanced crime hotspot detection using DBSCAN algorithm on Chicago crime data.")
 
-with col2:
-    st.markdown("### 🔬 Methodology")
-    st.markdown("**DBSCAN Clustering** for spatiotemporal hotspot identification. Noise points (-1) indicate isolated incidents.")
+# with col2:
+#     st.markdown("### 🔬 Methodology")
+#     st.markdown("**DBSCAN Clustering** for spatiotemporal hotspot identification. Noise points (-1) indicate isolated incidents.")
 
-with col3:
-    st.markdown("### 📊 Data")
-    d_min, d_max = df["date"].min(), df["date"].max()
-    date_range = f"{d_min.date()} to {d_max.date()}" if pd.notna(d_min) and pd.notna(d_max) else "N/A"
-    st.markdown(f"**Dataset Size:** {len(df):,} total incidents\n**Time Range:** {date_range}")
+# with col3:
+#     st.markdown("### 📊 Data")
+#     d_min, d_max = df["date"].min(), df["date"].max()
+#     date_range = f"{d_min.date()} to {d_max.date()}" if pd.notna(d_min) and pd.notna(d_max) else "N/A"
+#     st.markdown(f"**Dataset Size:** {len(df):,} total incidents\n**Time Range:** {date_range}")
 
