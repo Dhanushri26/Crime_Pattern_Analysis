@@ -93,13 +93,13 @@ st.markdown("""
         
         [data-testid="stMetricValue"] {
             color: darkblue;
-            font-size: 2.5em;
+            font-size: 2em;
             font-weight: 700;
         }
         
         [data-testid="stMetricLabel"] {
             color: darkblue;
-            font-size: 1em;
+            font-size: 0.6em;
         }
         
         .stTabs [data-baseweb="tab-list"] button {
@@ -138,7 +138,7 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 # SIDEBAR FILTERS
 # ============================================================================
 
-st.sidebar.markdown("## 🔧 Analysis Filters")
+st.sidebar.markdown("## Analysis Filters")
 st.sidebar.markdown("Configure the dashboard parameters below")
 
 with st.sidebar:
