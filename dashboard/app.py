@@ -87,16 +87,18 @@ st.markdown("""
             height: 3px;
             margin: 30px 0;
             border-radius: 2px;
+            color: darkgrey;
+
         }
         
         [data-testid="stMetricValue"] {
-            color: white;
+            color: darkblue;
             font-size: 2.5em;
             font-weight: 700;
         }
         
         [data-testid="stMetricLabel"] {
-            color: rgba(255,255,255,0.9);
+            color: darkblue;
             font-size: 1em;
         }
         
@@ -270,8 +272,9 @@ with tab1:
             title="Crime Hotspots Distribution"
         )
         
-        fig_map.update_hovertemplate(
-            "<b>%{hover_name}</b><br>" +
+        fig_map.update_traces(
+            hovertemplate=
+            "<b>%{hovertext}</b><br>" +
             "Latitude: %{lat:.4f}<br>" +
             "Longitude: %{lon:.4f}<br>" +
             "Hour: %{customdata[1]}<br>" +
